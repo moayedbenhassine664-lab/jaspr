@@ -1,167 +1,421 @@
----
-title: Quickstart
-description: Get started with Jaspr and build your first website in Dart.
----
+# Creating a ready-to-download Flutter project ZIP with bilingual (Arabic/English) Calisthenics app.
+# The code below will:
+# - Create a minimal Flutter project structure under /mnt/data/CalisthenicsMaster/
+# - Write a pubspec.yaml, lib/main.dart, and simple Android/ios ignore placeholders.
+# - Generate 5 placeholder PNG images (realistic stand-ins) inside assets/.
+# - Zip the project into /mnt/data/CalisthenicsMaster.zip
+# After execution, a download link will be provided.
+from pathlib import Path
+from PIL import Image, ImageDraw, ImageFont
+import zipfile, io, os, json, textwrap
 
----
+root = Path("/mnt/data/CalisthenicsMaster")
+if root.exists():
+    # remove existing to avoid stale content
+    import shutil
+    shutil.rmtree(root)
+root.mkdir(parents=True, exist_ok=True)
 
-To get started with Jaspr, you can either use the **Jaspr CLI** or our official **VSCode Extension**. The cli lets you manage the project from the command line, while the extension provides a more integrated experience within your IDE.
+# Create assets folder and placeholder images
+assets = root / "assets"
+assets.mkdir(parents=True, exist_ok=True)
 
-## VSCode Extension
+# Simple function to create placeholder images
+def make_image(path, label):
+    img = Image.new("RGB", (800, 500), color=(45, 55, 72))  # slate color
+    draw = ImageDraw.Draw(img)
+    try:
+        # Try to use a common font
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 48)
+    except Exception:
+        font = ImageFont.load_default()
+    w, h = draw.textsize(label, font=font)
+    draw.text(((800-w)/2, (500-h)/2), label, font=font, fill=(255,255,255))
+    img.save(path, "PNG")
 
-<Steps>
-  <Step title="Install Extension">
-    Install the Jaspr VSCode extension by searching for `Jaspr` in the extensions menu.
-  </Step>
-  <Step title="Create a Project">
-    To create a new Jaspr project, open the command palette (`Ctrl+Shift+P`) and select **Jaspr: New Project**. You are ask to choose from several templates and set a project folder.
+images = {
+    "pushup.png": "Push-up",
+    "pullup.png": "Pull-up",
+    "dips.png": "Dips",
+    "lsit.png": "L-sit",
+    "muscleup.png": "Muscle-up"
+}
+for fname, label in images.items():
+    make_image(assets / fname, label)
 
-    ![New Project](https://github.com/schultek/jaspr/blob/main/modules/jaspr-code/media/screenshots/new_project.png?raw=true)
+# Write pubspec.yaml
+pubspec = f"""
+name: calisthenics_master
+description: A bilingual Calisthenics Master app (Arabic/English) - demo project
+publish_to: "none"
+version: 1.0.0+1
 
-    <Info>
-      Choosing a template will not lock you into a specific configuration. Starting from one template you can easily modify your code to behave as any other template along the way.
-    </Info>
+environment:
+  sdk: ">=2.17.0 <3.0.0"
 
-    When running for the first time, the extension will ask you to install the Jaspr CLI. This is required to run the Jaspr development server and build your project.
-    
-  </Step>
-  <Step title="Debug your Jaspr Project">
-    To run and debug a Jaspr applications, launch it using F5 or the Debug menu. The extension will start the debug process and attach the Dart debugger to it. 
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.0.15
 
-    ---
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
 
-    When developing a Jaspr project in `static` or `server` mode, this will open **two** separate debugging sessions, one for the server and one for the client. Switch between the two using the debugging sidebar or process dropdown.
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/pushup.png
+    - assets/pullup.png
+    - assets/dips.png
+    - assets/lsit.png
+    - assets/muscleup.png
+"""
+(root / "pubspec.yaml").write_text(pubspec.strip(), encoding="utf-8")
 
-    | Sidebar | Dropdown. |
-    |---|---|
-    | ![Sidebar](https://github.com/schultek/jaspr/blob/main/modules/jaspr-code/media/screenshots/sidebar.png?raw=true) | ![Dropdown](https://github.com/schultek/jaspr/blob/main/modules/jaspr-code/media/screenshots/dropdown.png?raw=true)
+# Create lib folder and main.dart
+lib = root / "lib"
+lib.mkdir(parents=True, exist_ok=True)
 
-    Both processes will be managed by the main Jaspr terminal.
+main_dart = r'''
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-    ![Terminal](https://github.com/schultek/jaspr/blob/main/modules/jaspr-code/media/screenshots/terminal.png?raw=true)
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final prefs = await SharedPreferences.getInstance();
+  runApp(CalisthenicsApp(prefs: prefs));
+}
 
-    To stop the server, click "Stop Jaspr" in the status bar, or focus the terminal and press `Ctrl+C`. This will stop both debugging sessions and the main process.
-    You can also detach the debugging sessions individually using the detach button in the debug bar, but this will keep the app running.
+class CalisthenicsApp extends StatefulWidget {
+  final SharedPreferences prefs;
+  CalisthenicsApp({required this.prefs});
 
-  </Step>
-</Steps>
+  @override
+  _CalisthenicsAppState createState() => _CalisthenicsAppState();
+}
 
-You can now start developing your website. 🎉
+class _CalisthenicsAppState extends State<CalisthenicsApp> {
+  bool darkMode = false;
+  String locale = 'en'; // 'en' or 'ar'
 
-<Success>
-  Observe that the browser automatically refreshes the page when you change something in your code, like the `Welcome` text.
-</Success>
+  @override
+  void initState() {
+    super.initState();
+    darkMode = widget.prefs.getBool('darkMode') ?? false;
+    locale = widget.prefs.getString('locale') ?? 'en';
+  }
 
----
+  void toggleTheme(bool v) {
+    setState(() {
+      darkMode = v;
+      widget.prefs.setBool('darkMode', darkMode);
+    });
+  }
 
-## Jaspr CLI
-    
-<Steps>
-  <Step title="Install CLI">
-    Install the Jaspr CLI via:
+  void toggleLocale(String lang) {
+    setState(() {
+      locale = lang;
+      widget.prefs.setString('locale', locale);
+    });
+  }
 
-    ```js
-    dart pub global activate jaspr_cli
-    ```
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Calisthenics Master',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        brightness: darkMode ? Brightness.dark : Brightness.light,
+        primarySwatch: Colors.indigo,
+      ),
+      home: HomePage(prefs: widget.prefs, locale: locale, onToggleTheme: toggleTheme, onToggleLocale: toggleLocale),
+    );
+  }
+}
 
-    The `jaspr` command will be available in your terminal.
-  </Step>
-  <Step title="Create a Project">
-    To create a new project run:
+class MoveModel {
+  final String id;
+  final Map<String,String> name;
+  final Map<String,String> description;
+  final String difficulty;
+  final String asset;
+  MoveModel({required this.id, required this.name, required this.description, required this.difficulty, required this.asset});
+}
 
-    ```
-    jaspr create my_website
-    ```
+final List<MoveModel> moves = [
+  MoveModel(
+    id: 'push-up',
+    name: {'en':'Push-up','ar':'الضغط (Push-up)'},
+    description: {'en':'Basic chest/shoulder exercise building pressing strength.','ar':'الأساس في كل برامج الكاليستينيكس. يبني قوة للصدر والأكتاف.'},
+    difficulty: 'Beginner',
+    asset: 'assets/pushup.png'
+  ),
+  MoveModel(
+    id: 'pull-up',
+    name: {'en':'Pull-up','ar':'السحب (Pull-up)'},
+    description: {'en':'Back exercise that builds pulling strength.','ar':'بناء ظهر قوي. يتطلب قوة سحب وقبضة فعالة.'},
+    difficulty: 'Intermediate',
+    asset: 'assets/pullup.png'
+  ),
+  MoveModel(
+    id: 'dips',
+    name: {'en':'Dips','ar':'الغطسات (Dips)'},
+    description: {'en':'Great for chest and triceps.','ar':'تمرين ممتاز للصدر والعضلات الثلاثية.'},
+    difficulty: 'Intermediate',
+    asset: 'assets/dips.png'
+  ),
+  MoveModel(
+    id: 'lsit',
+    name: {'en':'L-sit','ar':'L-sit'},
+    description: {'en':'Core and hip flexor isometric hold.','ar':'تمرين ثابت لتقوية البطن والذراعين.'},
+    difficulty: 'Intermediate',
+    asset: 'assets/lsit.png'
+  ),
+  MoveModel(
+    id: 'muscle-up',
+    name: {'en':'Muscle-up','ar':'Muscle-up'},
+    description: {'en':'Advanced combo of pull-up and dip to get above the bar.','ar':'تمرين متقدم يجمع بين Pull-up و Dip.'},
+    difficulty: 'Advanced',
+    asset: 'assets/muscleup.png'
+  ),
+];
 
-    This will walk you through the setup wizard and create a new Jaspr project inside the `my_website` folder.
 
-    The cli will prompt you with a set of options to configure your project. You can read about what each option does [below](/get_started/quick_start#project-options) or just start with the recommended ones (simply press **Enter** each time).
+class HomePage extends StatefulWidget {
+  final SharedPreferences prefs;
+  final String locale;
+  final Function(bool) onToggleTheme;
+  final Function(String) onToggleLocale;
 
-    <Info>
-        If you are just starting out and are not sure what options to pick, just select the default one for each question
-        (simply press **Enter** each time).
-    </Info>
+  HomePage({required this.prefs, required this.locale, required this.onToggleTheme, required this.onToggleLocale});
 
-    <Info>
-        Choosing a set of options do not lock you into a specific configuration. Starting from one setup you can easily
-        modify your code to behave as any other setup along the way.
-    </Info>
-  </Step>
-  <Step title="Run the Development Server">
-    Start the development server via:
+  @override
+  _HomePageState createState() => _HomePageState();
+}
 
-    ```shell
-    cd my_website
-    jaspr serve
-    ```
+class _HomePageState extends State<HomePage> {
+  String query = '';
 
-    This will spin up a development server at `localhost:8080`.
-  </Step>
-</Steps>
+  @override
+  Widget build(BuildContext context) {
+    final isAr = widget.locale == 'ar';
+    final filtered = moves.where((m) => m.name[isAr ? 'ar' : 'en']!.toLowerCase().contains(query.toLowerCase())).toList();
 
-You can now start developing your website. 🎉
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(isAr ? 'Calisthenics Master' : 'Calisthenics Master'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.settings),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SettingsPage(prefs: widget.prefs, locale: widget.locale, onToggleTheme: widget.onToggleTheme, onToggleLocale: widget.onToggleLocale))),
+          )
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          children: [
+            TextField(
+              decoration: InputDecoration(
+                hintText: isAr ? 'ابحث عن حركة...' : 'Search move...',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onChanged: (v) => setState(() => query = v),
+            ),
+            SizedBox(height: 12),
+            Expanded(
+              child: GridView.builder(
+                itemCount: filtered.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 0.85,
+                ),
+                itemBuilder: (context, index) {
+                  final m = filtered[index];
+                  return GestureDetector(
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DetailPage(move: m, prefs: widget.prefs, locale: widget.locale))),
+                    child: Card(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 4,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Flexible(child: Padding(padding: EdgeInsets.all(8), child: Image.asset(m.asset, fit: BoxFit.contain))),
+                          SizedBox(height: 8),
+                          Text(m.name[isAr ? 'ar' : 'en']!, style: TextStyle(fontWeight: FontWeight.bold)),
+                          SizedBox(height: 4),
+                          Text(m.difficulty, style: TextStyle(color: Colors.grey[600])),
+                          SizedBox(height: 6),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-<Success>
-  Observe that the browser automatically refreshes the page when you change something in your code, like the `Welcome` text.
-</Success>
+class DetailPage extends StatefulWidget {
+  final MoveModel move;
+  final SharedPreferences prefs;
+  final String locale;
+  DetailPage({required this.move, required this.prefs, required this.locale});
 
-### Project Options
+  @override
+  _DetailPageState createState() => _DetailPageState();
+}
 
-When creating a new project through the **Jaspr CLI**, you will go through a set of questions to configure the project to your liking. The options set your rendering mode, hydration strategy, routing, flutter interoperability strategy and more.
+class _DetailPageState extends State<DetailPage> {
+  double progress = 0.0;
+  TextEditingController notesController = TextEditingController();
 
-You can choose from the following options:
+  @override
+  void initState() {
+    super.initState();
+    progress = widget.prefs.getDouble('${widget.move.id}_progress') ?? 0.0;
+    notesController.text = widget.prefs.getString('${widget.move.id}_notes') ?? '';
+  }
 
-<Property name="Rendering Mode">
-  Select one of the three rendering modes Jaspr supports. Read about the different modes [here](/get_started/modes).
-</Property>
+  Future<void> saveAll() async {
+    await widget.prefs.setDouble('${widget.move.id}_progress', progress);
+    await widget.prefs.setString('${widget.move.id}_notes', notesController.text);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.locale=='ar' ? 'تم الحفظ' : 'Saved')));
+  }
 
----
+  @override
+  Widget build(BuildContext context) {
+    final isAr = widget.locale == 'ar';
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.move.name[isAr ? 'ar' : 'en']!)),
+      body: Padding(
+        padding: EdgeInsets.all(14),
+        child: ListView(
+          children: [
+            Image.asset(widget.move.asset, height: 180, fit: BoxFit.contain),
+            SizedBox(height: 12),
+            Text(widget.move.description[isAr ? 'ar' : 'en']!),
+            SizedBox(height: 12),
+            Text(isAr ? 'التقدم' : 'Progress'),
+            SizedBox(height: 6),
+            Row(
+              children: [
+                IconButton(onPressed: () => setState(() => progress = (progress-0.1).clamp(0.0,1.0)), icon: Icon(Icons.remove)),
+                Expanded(child: LinearProgressIndicator(value: progress)),
+                IconButton(onPressed: () => setState(() => progress = (progress+0.1).clamp(0.0,1.0)), icon: Icon(Icons.add)),
+              ],
+            ),
+            SizedBox(height: 10),
+            ElevatedButton.icon(onPressed: saveAll, icon: Icon(Icons.save), label: Text(isAr ? 'حفظ' : 'Save')),
+            SizedBox(height: 16),
+            Text(isAr ? 'ملاحظاتك' : 'Your notes'),
+            SizedBox(height: 6),
+            TextField(controller: notesController, maxLines: 6, decoration: InputDecoration(border: OutlineInputBorder())),
+            SizedBox(height: 10),
+            ElevatedButton(onPressed: saveAll, child: Text(isAr ? 'حفظ الملاحظات' : 'Save notes')),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-<Property name="Hydration" type="conditional">
-  Select the hydration strategy (automatic or manual). Read about hydration [here](/concepts/hydration).
-</Property>
+class SettingsPage extends StatefulWidget {
+  final SharedPreferences prefs;
+  final String locale;
+  final Function(bool) onToggleTheme;
+  final Function(String) onToggleLocale;
 
----
+  SettingsPage({required this.prefs, required this.locale, required this.onToggleTheme, required this.onToggleLocale});
 
-<Property name="Routing">
-  Whether to set up routing. Selecting **Yes** will setup a basic `Routing` with two routes ('/home' and '/about'). This gives you a convenient
-  starting point when you plan to develop a website with multiple pages.
-</Property>
+  @override
+  _SettingsPageState createState() => _SettingsPageState();
+}
 
----
+class _SettingsPageState extends State<SettingsPage> {
+  bool darkMode = false;
+  String locale = 'en';
 
-<Property name="Multi-Page Routing" type="conditional">
-  Whether to set up multi-page or single-page routing, also called server-side or client-side routing respectively. This defined how navigating
-  between routes will behave. Either a "real" page load is performed when navigating to a new route (aka. the browser requests the new page using its url from the server).
-  Or the routing happens purely on the client without any request to the server.
+  @override
+  void initState() {
+    super.initState();
+    darkMode = widget.prefs.getBool('darkMode') ?? false;
+    locale = widget.prefs.getString('locale') ?? widget.locale;
+  }
 
-  <Info>
-      There are different advantages and disadvantages for both types. To help you decide you can find many [articles](https://www.google.com/search?q=multi+page+vs+single+page+site) about this topic.
-  </Info>
+  void save() {
+    widget.prefs.setBool('darkMode', darkMode);
+    widget.prefs.setString('locale', locale);
+    widget.onToggleTheme(darkMode);
+    widget.onToggleLocale(locale);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(locale=='ar' ? 'تم الحفظ' : 'Saved')));
+  }
 
-  Read more about routing [here](/concepts/routing).
-</Property>
+  @override
+  Widget build(BuildContext context) {
+    final isAr = widget.locale=='ar';
+    return Scaffold(
+      appBar: AppBar(title: Text(isAr ? 'الإعدادات' : 'Settings')),
+      body: Padding(
+        padding: EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SwitchListTile(
+              title: Text(isAr ? 'الوضع الداكن' : 'Dark mode'),
+              value: darkMode,
+              onChanged: (v) => setState(() => darkMode = v),
+            ),
+            SizedBox(height: 8),
+            Text(isAr ? 'اللغة' : 'Language'),
+            Row(
+              children: [
+                ElevatedButton(onPressed: () => setState(() => locale='en'), child: Text('English')),
+                SizedBox(width: 8),
+                ElevatedButton(onPressed: () => setState(() => locale='ar'), child: Text('العربية')),
+              ],
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(onPressed: save, child: Text(isAr ? 'حفظ' : 'Save')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+'''
 
----
+(lib / "main.dart").write_text(main_dart.strip(), encoding="utf-8")
 
-<Property name="Flutter Embedding">
-  Whether to setup an embedded Flutter application with your site. This will use Jaspr's first-party integration for [Flutter element embedding](https://docs.flutter.dev/deployment/web#embedding-a-flutter-app-into-an-html-page) and create a simple Flutter counter app that synchronizes its state with your Jaspr site.
-</Property>
+# Add a simple README
+readme = """
+Calisthenics Master - Flutter demo project
+-----------------------------------------
+This project is generated automatically for the user. It includes:
+- lib/main.dart (the app)
+- assets/*.png (placeholder images)
+- pubspec.yaml configured with shared_preferences dependency
 
----
+How to run:
+1. Ensure Flutter SDK is installed.
+2. Open project folder in VS Code or Android Studio.
+3. Run `flutter pub get` then `flutter run` (select a mobile device/emulator).
+"""
 
-<Property name="Plugin Support">
-  Whether to enable support for Flutter web plugins. This will switch to Jaspr's custom compiler pipeline (replacing `build_web_compilers`) which allows the use of most Flutter web plugins in your Jaspr site without any additional setup.
-  *Flutter web plugins* refers to any Flutter plugin from pub.dev that supports web and is not concerned with widgets or rendering. This includes packages like `shared_preferences` or `firebase`.
-</Property>
+(root / "README.txt").write_text(readme.strip(), encoding="utf-8")
 
----
+# Zip the project
+zip_path = Path("/mnt/data/CalisthenicsMaster.zip")
+with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+    for f in root.rglob("*"):
+        zf.write(f, f.relative_to(root.parent))
 
-<Property name="Custom Backend" type="conditional">
-  Whether to use a custom backend package or framework for the server part of your project. You can choose between:
-  - **None**: No backend setup. This is the default option and is recommended if you are just starting out.
-  - **Shelf**: A simple and lightweight web server for Dart. This is a good choice if you want to build a custom backend for your project.
-  - *More options coming soon*
-
-  Read more about backends [here](/going_further/backend).
-</Property>
+print(f"Created ZIP at: {zip_path}")
