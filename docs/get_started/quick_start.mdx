@@ -1,167 +1,187 @@
----
-title: Quickstart
-description: Get started with Jaspr and build your first website in Dart.
----
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
----
+void main() {
+  runApp(CalisthenicsApp());
+}
 
-To get started with Jaspr, you can either use the **Jaspr CLI** or our official **VSCode Extension**. The cli lets you manage the project from the command line, while the extension provides a more integrated experience within your IDE.
+class CalisthenicsApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Calisthenics Master',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        primarySwatch: Colors.indigo,
+        scaffoldBackgroundColor: Colors.grey[100],
+      ),
+      home: HomePage(),
+    );
+  }
+}
 
-## VSCode Extension
+class Move {
+  final String name;
+  final String description;
+  final String difficulty;
+  final String image;
 
-<Steps>
-  <Step title="Install Extension">
-    Install the Jaspr VSCode extension by searching for `Jaspr` in the extensions menu.
-  </Step>
-  <Step title="Create a Project">
-    To create a new Jaspr project, open the command palette (`Ctrl+Shift+P`) and select **Jaspr: New Project**. You are ask to choose from several templates and set a project folder.
+  Move(this.name, this.description, this.difficulty, this.image);
+}
 
-    ![New Project](https://github.com/schultek/jaspr/blob/main/modules/jaspr-code/media/screenshots/new_project.png?raw=true)
+List<Move> moves = [
+  Move("Push-up", "الأساس في كل برامج الكاليستينيكس.", "مبتدئ", "assets/pushup.png"),
+  Move("Pull-up", "بناء ظهر قوي.", "متوسط", "assets/pullup.png"),
+  Move("Dips", "تمرين ممتاز للصدر والترايسبس.", "متوسط", "assets/dips.png"),
+  Move("L-sit", "تمرين متقدم للجزء السفلي واللب.", "متقدم", "assets/lsit.png"),
+  Move("Muscle-up", "حركة متقدمة تجمع القوة والتقنية.", "متقدم", "assets/muscleup.png"),
+];
 
-    <Info>
-      Choosing a template will not lock you into a specific configuration. Starting from one template you can easily modify your code to behave as any other template along the way.
-    </Info>
+class HomePage extends StatefulWidget {
+  @override
+  _HomePageState createState() => _HomePageState();
+}
 
-    When running for the first time, the extension will ask you to install the Jaspr CLI. This is required to run the Jaspr development server and build your project.
-    
-  </Step>
-  <Step title="Debug your Jaspr Project">
-    To run and debug a Jaspr applications, launch it using F5 or the Debug menu. The extension will start the debug process and attach the Dart debugger to it. 
+class _HomePageState extends State<HomePage> {
+  String searchQuery = "";
 
-    ---
+  @override
+  Widget build(BuildContext context) {
+    List<Move> filtered = moves
+        .where((move) => move.name.toLowerCase().contains(searchQuery.toLowerCase()))
+        .toList();
 
-    When developing a Jaspr project in `static` or `server` mode, this will open **two** separate debugging sessions, one for the server and one for the client. Switch between the two using the debugging sidebar or process dropdown.
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("Calisthenics Master"),
+        centerTitle: true,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          children: [
+            TextField(
+              decoration: InputDecoration(
+                labelText: "ابحث عن حركة",
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
+              ),
+              onChanged: (value) => setState(() => searchQuery = value),
+            ),
+            SizedBox(height: 12),
+            Expanded(
+              child: GridView.builder(
+                itemCount: filtered.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.9,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                ),
+                itemBuilder: (context, index) {
+                  final move = filtered[index];
+                  return GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => MoveDetailPage(move: move)),
+                    ),
+                    child: Card(
+                      elevation: 5,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.asset(move.image, height: 80),
+                          SizedBox(height: 10),
+                          Text(move.name,
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Text(move.difficulty, style: TextStyle(color: Colors.grey[700])),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-    | Sidebar | Dropdown. |
-    |---|---|
-    | ![Sidebar](https://github.com/schultek/jaspr/blob/main/modules/jaspr-code/media/screenshots/sidebar.png?raw=true) | ![Dropdown](https://github.com/schultek/jaspr/blob/main/modules/jaspr-code/media/screenshots/dropdown.png?raw=true)
+class MoveDetailPage extends StatefulWidget {
+  final Move move;
+  MoveDetailPage({required this.move});
 
-    Both processes will be managed by the main Jaspr terminal.
+  @override
+  _MoveDetailPageState createState() => _MoveDetailPageState();
+}
 
-    ![Terminal](https://github.com/schultek/jaspr/blob/main/modules/jaspr-code/media/screenshots/terminal.png?raw=true)
+class _MoveDetailPageState extends State<MoveDetailPage> {
+  double progress = 0.0;
+  TextEditingController notesController = TextEditingController();
 
-    To stop the server, click "Stop Jaspr" in the status bar, or focus the terminal and press `Ctrl+C`. This will stop both debugging sessions and the main process.
-    You can also detach the debugging sessions individually using the detach button in the debug bar, but this will keep the app running.
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedData();
+  }
 
-  </Step>
-</Steps>
+  Future<void> _loadSavedData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      progress = prefs.getDouble('${widget.move.name}_progress') ?? 0.0;
+      notesController.text = prefs.getString('${widget.move.name}_notes') ?? '';
+    });
+  }
 
-You can now start developing your website. 🎉
+  Future<void> _saveData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('${widget.move.name}_progress', progress);
+    await prefs.setString('${widget.move.name}_notes', notesController.text);
+  }
 
-<Success>
-  Observe that the browser automatically refreshes the page when you change something in your code, like the `Welcome` text.
-</Success>
-
----
-
-## Jaspr CLI
-    
-<Steps>
-  <Step title="Install CLI">
-    Install the Jaspr CLI via:
-
-    ```js
-    dart pub global activate jaspr_cli
-    ```
-
-    The `jaspr` command will be available in your terminal.
-  </Step>
-  <Step title="Create a Project">
-    To create a new project run:
-
-    ```
-    jaspr create my_website
-    ```
-
-    This will walk you through the setup wizard and create a new Jaspr project inside the `my_website` folder.
-
-    The cli will prompt you with a set of options to configure your project. You can read about what each option does [below](/get_started/quick_start#project-options) or just start with the recommended ones (simply press **Enter** each time).
-
-    <Info>
-        If you are just starting out and are not sure what options to pick, just select the default one for each question
-        (simply press **Enter** each time).
-    </Info>
-
-    <Info>
-        Choosing a set of options do not lock you into a specific configuration. Starting from one setup you can easily
-        modify your code to behave as any other setup along the way.
-    </Info>
-  </Step>
-  <Step title="Run the Development Server">
-    Start the development server via:
-
-    ```shell
-    cd my_website
-    jaspr serve
-    ```
-
-    This will spin up a development server at `localhost:8080`.
-  </Step>
-</Steps>
-
-You can now start developing your website. 🎉
-
-<Success>
-  Observe that the browser automatically refreshes the page when you change something in your code, like the `Welcome` text.
-</Success>
-
-### Project Options
-
-When creating a new project through the **Jaspr CLI**, you will go through a set of questions to configure the project to your liking. The options set your rendering mode, hydration strategy, routing, flutter interoperability strategy and more.
-
-You can choose from the following options:
-
-<Property name="Rendering Mode">
-  Select one of the three rendering modes Jaspr supports. Read about the different modes [here](/get_started/modes).
-</Property>
-
----
-
-<Property name="Hydration" type="conditional">
-  Select the hydration strategy (automatic or manual). Read about hydration [here](/concepts/hydration).
-</Property>
-
----
-
-<Property name="Routing">
-  Whether to set up routing. Selecting **Yes** will setup a basic `Routing` with two routes ('/home' and '/about'). This gives you a convenient
-  starting point when you plan to develop a website with multiple pages.
-</Property>
-
----
-
-<Property name="Multi-Page Routing" type="conditional">
-  Whether to set up multi-page or single-page routing, also called server-side or client-side routing respectively. This defined how navigating
-  between routes will behave. Either a "real" page load is performed when navigating to a new route (aka. the browser requests the new page using its url from the server).
-  Or the routing happens purely on the client without any request to the server.
-
-  <Info>
-      There are different advantages and disadvantages for both types. To help you decide you can find many [articles](https://www.google.com/search?q=multi+page+vs+single+page+site) about this topic.
-  </Info>
-
-  Read more about routing [here](/concepts/routing).
-</Property>
-
----
-
-<Property name="Flutter Embedding">
-  Whether to setup an embedded Flutter application with your site. This will use Jaspr's first-party integration for [Flutter element embedding](https://docs.flutter.dev/deployment/web#embedding-a-flutter-app-into-an-html-page) and create a simple Flutter counter app that synchronizes its state with your Jaspr site.
-</Property>
-
----
-
-<Property name="Plugin Support">
-  Whether to enable support for Flutter web plugins. This will switch to Jaspr's custom compiler pipeline (replacing `build_web_compilers`) which allows the use of most Flutter web plugins in your Jaspr site without any additional setup.
-  *Flutter web plugins* refers to any Flutter plugin from pub.dev that supports web and is not concerned with widgets or rendering. This includes packages like `shared_preferences` or `firebase`.
-</Property>
-
----
-
-<Property name="Custom Backend" type="conditional">
-  Whether to use a custom backend package or framework for the server part of your project. You can choose between:
-  - **None**: No backend setup. This is the default option and is recommended if you are just starting out.
-  - **Shelf**: A simple and lightweight web server for Dart. This is a good choice if you want to build a custom backend for your project.
-  - *More options coming soon*
-
-  Read more about backends [here](/going_further/backend).
-</Property>
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.move.name)),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: ListView(
+          children: [
+            Image.asset(widget.move.image, height: 180),
+            SizedBox(height: 10),
+            Text(widget.move.description, style: TextStyle(fontSize: 16)),
+            SizedBox(height: 20),
+            Text("مستوى التقدم: ${(progress * 100).toStringAsFixed(0)}%"),
+            Slider(
+              value: progress,
+              onChanged: (v) => setState(() => progress = v),
+            ),
+            ElevatedButton.icon(
+              onPressed: _saveData,
+              icon: Icon(Icons.save),
+              label: Text("حفظ التقدم"),
+            ),
+            SizedBox(height: 20),
+            TextField(
+              controller: notesController,
+              decoration: InputDecoration(
+                labelText: "ملاحظاتك حول الحركة",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              maxLines: 4,
+            ),
+            SizedBox(height: 10),
+            ElevatedButton.icon(
+              onPressed: _saveData,
+              icon: Icon(Icons.note_alt),
+              label: Text("حفظ الملاحظات"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
